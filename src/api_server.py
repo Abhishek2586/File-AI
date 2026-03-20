@@ -49,19 +49,6 @@ def _get_db():
         try:
             from modules.chromadb_handler import ChromaDBHandler
             db_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "chroma")
-            
-            # Vercel Serverless File System Workaround
-            if os.environ.get("VERCEL"):
-                import shutil
-                tmp_dir = "/tmp/chroma"
-                if not os.path.exists(tmp_dir):
-                    try:
-                        shutil.copytree(db_dir, tmp_dir)
-                        logger.info(f"Copied ChromaDB to ephemeral {tmp_dir}")
-                    except Exception as ce:
-                        logger.warning(f"Failed to copy ChromaDB to {tmp_dir}: {ce}")
-                db_dir = tmp_dir
-
             os.makedirs(db_dir, exist_ok=True)
             _db = ChromaDBHandler(persist_directory=db_dir, collection_name="document_chunks")
             logger.info(f"ChromaDB initialised ({_db.get_count()} vectors)")
@@ -580,5 +567,6 @@ if __name__ == "__main__":
     logger.info("Initialising backend (DB + QA)...")
     _get_db()
     _get_qa()
-    logger.info("Starting FileAI API server on http://127.0.0.1:5000")
-    app.run(host="127.0.0.1", port=5000, debug=True, use_reloader=False)
+    port = int(os.environ.get("PORT", 7860))
+    logger.info(f"Starting FileAI API server on http://0.0.0.0:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)

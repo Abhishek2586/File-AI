@@ -10,8 +10,7 @@ An intelligent, AI-powered system built with Flask, OpenAI, and ChromaDB that al
 
 ## 🌟 Key Features
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
-
+[![Deploy to Hugging Face](https://huggingface.co/datasets/huggingface/badges/resolve/main/deploy-to-spaces-lg.svg)](https://huggingface.co/new-space?template=docker)
 
 *   **PDF Processing & Text Extraction**: Seamlessly extracts and processes text from multiple uploaded PDF documents.
 *   **Semantic Search**: Utilizes advanced vector similarity search (via ChromaDB) to retrieve the most relevant document chunks based on user queries.
