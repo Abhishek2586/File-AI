@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FileAI — Smart File Assistant</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;700&display=swap"
+    rel="stylesheet" />
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap"
+    rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    rel="stylesheet" />
+
+  <style>
+    /* Unauthenticated Creative UI Styles */
+    :root {
+      --primary-vibrant: #FF3366;
+      --secondary-vibrant: #FFD700;
+      --accent-blue: #3366FF;
+      --soft-bg: #FFF9F0;
+      --vibrant-green: #00D26A;
+    }
+
+    .quirky-title {
+      font-family: 'Bungee', cursive;
+    }
+
+    .floating-card {
+      box-shadow: 12px 12px 0px rgba(0, 0, 0, 0.1);
+    }
+
+    .blob-shape {
+      border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+    }
+
+    /* Exceptions for Unauthenticated Pages */
+    #root[data-route="landing"] *,
+    #root[data-route="login"] *,
+    #root[data-route="signup"] *,
+    #root[data-route="forgot-password"] * {
+      border-radius: initial;
+    }
+
+    #root[data-route="landing"] body,
+    #root[data-route="login"] body,
+    #root[data-route="signup"] body,
+    #root[data-route="forgot-password"] body {
+      font-family: 'Fredoka', sans-serif;
+      background-color: var(--soft-bg);
+    }
+
+    /* Authenticated Global Shell Styles (Swiss/Industrial) */
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #FAFAFA;
+      background-image:
+        url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23000000' stroke-opacity='0.15' stroke-width='1.5'%3E%3Cpath d='M40 40 h30 v40 h-30 z M45 50 h20 M45 60 h20 M45 70 h10' /%3E%3Cpath d='M260 60 h12 v20 h-12 z M276 50 h12 v30 h-12 z M292 40 h12 v40 h-12 z' /%3E%3Ccircle cx='80' cy='260' r='5' /%3E%3Ccircle cx='110' cy='230' r='5' /%3E%3Ccircle cx='140' cy='280' r='5' /%3E%3Cpath d='M84 256 L106 234 M114 234 L136 276 M84 263 L134 278' /%3E%3Cpath d='M280 250 C 280 240, 320 240, 320 250 C 320 260, 280 260, 280 250 Z M 280 250 L 280 280 C 280 290, 320 290, 320 280 L 320 250 M 280 265 C 280 275, 320 275, 320 265' /%3E%3Cpath d='M75 60 L240 60' stroke-dasharray='4' /%3E%3Cpath d='M300 230 L300 100' stroke-dasharray='4' /%3E%3Cpath d='M200 195 v10 M195 200 h10 M350 350 v10 M345 355 h10 M50 350 v10 M45 355 h10 M350 100 v10 M345 105 h10' /%3E%3C/g%3E%3C/svg%3E"),
+        linear-gradient(to right, rgba(0, 0, 0, 0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.06) 1px, transparent 1px);
+      background-size: 400px 400px, 40px 40px, 40px 40px;
+    }
+
+    .swiss {
+      border: 1px solid #000;
+    }
+
+    .nav-active {
+      border-left: 3px solid #FF4F00;
+      background: #F4F4F5;
+    }
+
+    details>summary {
+      list-style: none;
+      cursor: pointer;
+    }
+
+    details>summary::-webkit-details-marker {
+      display: none;
+    }
+
+    #main-content {
+      animation: fadein 0.15s ease-out;
+    }
+
+    @keyframes fadein {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #ccc;
+    }
+  </style>
+</head>
+
+<body class="bg-white text-slate-900">
+  <div id="app"></div>
+
+  <script>
+    // ── State ────────────────────────────────────────────────────────────────
+    const state = {
+      user: null,
+      settings: { model: 'gpt-3.5-turbo', temperature: 0.3, max_tokens: 600, top_k: 5 },
+      docsCount: 4
+    };
+
+    // ── API Helper ────────────────────────────────────────────────────────────
+    async function api(method, path, body) {
+      const opts = { method, credentials: 'include', headers: { 'Content-Type': 'application/json' } };
+      if (body) opts.body = JSON.stringify(body);
+      const r = await fetch(path, opts);
+      return r.json();
+    }
+
+    // ── Shell HTML ────────────────────────────────────────────────────────────
+    function sidebarHTML(active) {
+      const pages = [
+        ['dashboard', 'Dashboard', 'dashboard'],
+        ['chat', 'AI Chat Assistant', 'chat'],
+        ['insights', 'Key Insights', 'lightbulb'],
+        ['documents', 'Document Explorer', 'folder'],
+        ['faq', 'FAQ', 'help'],
+        ['history', 'Search History', 'history'],
+        ['settings', 'Settings', 'settings'],
+        ['profile', 'Profile', 'person']
+      ];
+      const links = pages.map(([id, label, icon]) => {
+        const isActive = active === id;
+        return `<a href="#${id}" class="flex items-center gap-3 px-6 py-3 text-[11px] font-bold uppercase tracking-wider transition-colors ${isActive ? 'nav-active text-black' : 'text-slate-600 hover:bg-[#F4F4F5]'}">
+      <span class="material-symbols-outlined text-[18px]">${icon}</span>${label}</a>`;
+      }).join('');
+      return `<aside class="w-[240px] h-screen flex-shrink-0 border-r border-black bg-white flex flex-col fixed left-0 top-0 z-40">
+    <div class="p-6 border-b border-black">
+      <h1 class="font-serif text-2xl font-bold text-black leading-none">FileAI</h1>
+      <p class="font-mono text-[10px] text-slate-500 mt-1 uppercase tracking-tight">AI-Based Smart File Assistant</p>
+    </div>
+    <nav class="flex-1 py-2 overflow-y-auto flex flex-col">${links}</nav>
+    <div class="p-6 border-t border-black">
+      <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Knowledge Base</p>
+      <div class="inline-flex items-center gap-2 swiss px-2 py-1">
+        <span class="material-symbols-outlined text-[14px]">database</span>
+        <span id="docs-badge" class="font-mono text-[10px] font-bold uppercase">${state.docsCount} DOCS LOADED</span>
+      </div>
+    </div>
+  </aside>`;
+    }
+
+    function headerHTML(title, pageName) {
+      const u = state.user || {};
+      const initials = u.initials || 'JD';
+      const name = u.name || 'John Doe';
+      return `<header class="h-16 border-b border-black bg-white flex items-center justify-between px-8 fixed top-0 left-[240px] right-0 z-30">
+    <div class="flex flex-col justify-center">
+      <h2 class="font-serif text-[18px] font-bold text-black leading-none">${title}</h2>
+      <span class="font-mono text-[11px] text-slate-500 mt-0.5">FileAI / ${pageName}</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="w-9 h-9 bg-black flex items-center justify-center text-white font-bold text-xs">${initials}</div>
+      <span class="text-[13px] font-medium">${name}</span>
+      <div class="w-px h-4 bg-slate-300"></div>
+      <button onclick="doLogout()" class="text-[13px] text-slate-600 hover:underline">Logout</button>
+    </div>
+  </header>`;
+    }
+
+    function shellWrap(active, title, pageName, contentHTML) {
+      return `${sidebarHTML(active)}
+  ${headerHTML(title, pageName)}
+  <div class="ml-[240px] pt-16 min-h-screen">
+    <main id="main-content" class="p-8 overflow-y-auto">${contentHTML}</main>
+  </div>`;
+    }
+
+    // ── Router ─────────────────────────────────────────────────────────────────
+    const app = document.getElementById('app');
+
+    async function route() {
+      const hash = location.hash.replace('#', '') || 'landing';
+      document.body.parentElement.setAttribute('data-route', hash);
+      const appDiv = document.getElementById('app');
+      if (appDiv) appDiv.setAttribute('data-route', hash);
+
+      const meRes = await api('GET', '/api/me');
+      if (meRes.authenticated) state.user = meRes.user;
+
+      if (['landing', 'login', 'signup', 'forgot-password'].includes(hash)) {
+        if (meRes.authenticated && hash === 'login') { location.hash = 'dashboard'; return; }
+
+        if (hash === 'landing') return renderLanding();
+        if (hash === 'login') return renderLogin();
+        if (hash === 'signup') return renderSignup();
+        if (hash === 'forgot-password') return renderForgotPassword();
+        return;
+      }
+
+      if (!meRes.authenticated) { location.hash = 'login'; return; }
+
+      // Load docs count in background
+      api('GET', '/api/documents/count').then(d => { if (d.documents != null) { state.docsCount = d.documents; const b = document.getElementById('docs-badge'); if (b) b.textContent = d.documents + ' DOCS LOADED'; } });
+
+      switch (hash) {
+        case 'dashboard': return renderDashboard();
+        case 'chat': return renderChat();
+        case 'insights': return renderInsights();
+        case 'documents': return renderDocuments();
+        case 'faq': return renderFAQ();
+        case 'history': return renderHistory();
+        case 'settings': return renderSettings();
+        case 'profile': return renderProfile();
+        default: location.hash = 'dashboard';
+      }
+    }
+
+    window.addEventListener('hashchange', route);
+    window.addEventListener('DOMContentLoaded', route);
+
+    async function doLogout() {
+      await api('POST', '/api/logout');
+      state.user = null;
+      location.hash = 'login';
+    }
+
+    // ── UNAUTHENTICATED PAGES ───────────────────────────────────────────────
+
+    function renderLanding() {
+      app.innerHTML = `
+<nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b-4 border-black px-6 py-4">
+<div class="max-w-7xl mx-auto flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-black rounded-xl flex items-center justify-center rotate-3">
+<span class="material-symbols-outlined text-white text-2xl">folder_managed</span>
+</div>
+<span class="quirky-title text-2xl tracking-wider">FileAI</span>
+</div>
+<div class="flex items-center gap-8">
+<a class="font-bold text-black hover:text-[var(--primary-vibrant)] transition-colors" href="#login">Log In</a>
+<a class="bg-[var(--secondary-vibrant)] text-black px-6 py-3 rounded-2xl font-bold border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all" href="#signup">
+Get Started
+</a>
+</div>
+</div>
+</nav>
+<main>
+<section class="relative overflow-hidden pt-16 pb-24 md:pt-24 md:pb-32 px-6">
+<div class="absolute top-20 -left-20 w-96 h-96 bg-[var(--accent-blue)]/10 blob-shape -z-10"></div>
+<div class="absolute bottom-10 right-0 w-[500px] h-[500px] bg-[var(--secondary-vibrant)]/10 blob-shape -z-10"></div>
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-16">
+<div class="w-full md:w-1/2 space-y-8">
+<h1 class="quirky-title text-4xl md:text-6xl leading-tight text-black">
+The intelligence layer for enterprise technology standards.
+</h1>
+<p class="text-xl md:text-2xl font-medium text-slate-600 leading-relaxed">
+Stop searching. Start querying NIST, IISF, and Cloud governance frameworks instantly.
+</p>
+<div class="pt-4">
+<a href="#login" class="inline-flex bg-black text-white px-8 py-5 rounded-2xl quirky-title text-xl tracking-widest hover:bg-[var(--primary-vibrant)] hover:scale-105 transition-all items-center gap-3 shadow-2xl">
+Start Querying →
+</a>
+</div>
+</div>
+<div class="w-full md:w-1/2 relative">
+<div class="relative group">
+<div class="relative overflow-hidden rounded-[3rem] border-8 border-white shadow-2xl rotate-[1deg]">
+<img alt="Abstract playful data journey" class="w-full h-[500px] object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvhSTdiTxNtDoQLjvrapzo8NFQvUEggzs0_OT0az985i3XSTZhOMjJl-kntTDtdSsG8fTFcnXbwABWl5MXREMufj4s-fYxZSboy0qOaXatHljvMFux2cV_Q1_7U00QScNID9_6Z8_1ziIaeBsDw-xUN0SzqaOWprxM-gvvGDOrcAHyuDpo33cAFOKlE74fc9XzkW4JYLO2uuZ4suOnFS-kjZfLyrLdPGwNasIVW4lZqFO00ZuH-R54WQJ3ydfNm1YHMYORCZSNjoY">
+<div class="absolute inset-0 bg-gradient-to-tr from-[var(--accent-blue)]/20 to-transparent"></div>
+</div>
+<div class="absolute -top-12 -right-6 w-32 h-32 bg-[var(--secondary-vibrant)] rounded-full border-4 border-black flex items-center justify-center shadow-xl rotate-12 z-20">
+<span class="material-symbols-outlined text-5xl text-black">auto_awesome</span>
+</div>
+<div class="absolute top-1/2 -left-12 bg-white p-6 rounded-3xl shadow-xl max-w-[200px] border-4 border-[var(--accent-blue)] rotate-[-6deg] z-20 hidden lg:block">
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-red-400"></div><div class="w-3 h-3 rounded-full bg-yellow-400"></div><div class="w-3 h-3 rounded-full bg-green-400"></div>
+</div>
+<p class="font-bold text-sm">Query: "Explain NIST SP 800-53..."</p>
+</div>
+</div>
+<div class="absolute -bottom-8 right-12 bg-white px-8 py-4 rounded-full shadow-2xl border-4 border-black z-20 flex items-center gap-3">
+<span class="material-symbols-outlined text-[var(--primary-vibrant)]">verified</span>
+<span class="font-bold text-lg italic text-black uppercase tracking-tight">Enterprise Ready</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 px-6 bg-white border-y-8 border-black">
+<div class="max-w-7xl mx-auto">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+<div class="group p-10 bg-[var(--soft-bg)] border-4 border-black rounded-[2.5rem] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[-8px] transition-all">
+<div class="mb-6 flex items-center justify-between">
+<span class="quirky-title text-5xl text-[var(--primary-vibrant)]">01.</span>
+<div class="w-14 h-14 bg-[var(--primary-vibrant)] text-white rounded-2xl flex items-center justify-center -rotate-6">
+<span class="material-symbols-outlined text-3xl">hub</span>
+</div>
+</div>
+<h3 class="quirky-title text-2xl mb-4 text-black">Full Context Retrieval</h3>
+<p class="text-slate-700 font-medium text-lg leading-relaxed">Instantly search across thousands of vectors from enterprise tech standards without manual reading.</p>
+</div>
+<div class="group p-10 bg-[var(--soft-bg)] border-4 border-black rounded-[2.5rem] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[-8px] transition-all">
+<div class="mb-6 flex items-center justify-between">
+<span class="quirky-title text-5xl text-[var(--accent-blue)]">02.</span>
+<div class="w-14 h-14 bg-[var(--accent-blue)] text-white rounded-2xl flex items-center justify-center rotate-6">
+<span class="material-symbols-outlined text-3xl">fact_check</span>
+</div>
+</div>
+<h3 class="quirky-title text-2xl mb-4 text-black">Exact Citations</h3>
+<p class="text-slate-700 font-medium text-lg leading-relaxed">Every answer is backed by direct page-number citations to the original framework PDFs.</p>
+</div>
+<div class="group p-10 bg-[var(--soft-bg)] border-4 border-black rounded-[2.5rem] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[-8px] transition-all">
+<div class="mb-6 flex items-center justify-between">
+<span class="quirky-title text-5xl text-black">03.</span>
+<div class="w-14 h-14 bg-[var(--secondary-vibrant)] text-black rounded-2xl flex items-center justify-center rotate-12">
+<span class="material-symbols-outlined text-3xl">auto_fix_high</span>
+</div>
+</div>
+<h3 class="quirky-title text-2xl mb-4 text-black">Preloaded Governance</h3>
+<p class="text-slate-700 font-medium text-lg leading-relaxed">Zero setup required. We manage the ingestion and indexing of complex standards.</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<footer class="py-16 px-6 bg-[var(--soft-bg)]">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 border-t-2 border-slate-200 pt-12">
+<div class="flex items-center gap-3 opacity-60 grayscale">
+<div class="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-lg">folder_managed</span>
+</div>
+<span class="quirky-title text-xl tracking-wider">FileAI</span>
+</div>
+<div class="text-slate-500 font-semibold flex items-center gap-2">
+© FileAI · Secure Access <span class="material-symbols-outlined text-sm">lock</span>
+</div>
+</div>
+</footer>`;
+    }
+
+    function renderLogin() {
+      app.innerHTML = `
+<main class="flex flex-col md:flex-row min-h-screen relative overflow-hidden">
+<section class="w-full md:w-[70%] bg-[#FFEFD5] relative flex flex-col items-center justify-center p-8 md:p-12 lg:p-20 overflow-hidden" id="illustration-panel">
+<div class="absolute -top-20 -left-20 w-64 h-64 bg-[#3366FF]/20 blob-shape"></div>
+<div class="absolute -bottom-32 -right-10 w-96 h-96 bg-[#FF3366]/10 blob-shape"></div>
+<div class="absolute top-10 left-10 flex items-center gap-3 z-10 cursor-pointer" onclick="location.hash='landing'">
+<div class="w-12 h-12 bg-black rounded-2xl flex items-center justify-center rotate-6">
+<span class="material-symbols-outlined text-white text-3xl">folder_managed</span>
+</div>
+<span class="quirky-title text-2xl tracking-wider">FileAI</span>
+</div>
+<div class="relative w-full max-w-2xl z-10">
+<div class="relative">
+<img alt="Abstract playful data journey" class="w-full h-auto object-cover rounded-[3rem] border-8 border-white shadow-2xl rotate-[-2deg]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvhSTdiTxNtDoQLjvrapzo8NFQvUEggzs0_OT0az985i3XSTZhOMjJl-kntTDtdSsG8fTFcnXbwABWl5MXREMufj4s-fYxZSboy0qOaXatHljvMFux2cV_Q1_7U00QScNID9_6Z8_1ziIaeBsDw-xUN0SzqaOWprxM-gvvGDOrcAHyuDpo33cAFOKlE74fc9XzkW4JYLO2uuZ4suOnFS-kjZfLyrLdPGwNasIVW4lZqFO00ZuH-R54WQJ3ydfNm1YHMYORCZSNjoY"/>
+<div class="absolute -top-8 -right-8 w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg animate-bounce duration-[3000ms]">
+<span class="material-symbols-outlined text-4xl text-black">insights</span>
+</div>
+<div class="absolute -bottom-6 -left-10 bg-white p-6 rounded-3xl shadow-xl max-w-xs rotate-[4deg] border-2 border-slate-100">
+<p class="text-xl font-bold leading-tight">"Data is better when it's fun to explore!"</p>
+</div>
+</div>
+</div>
+</section>
+<section class="w-full md:w-[30%] flex items-center justify-center p-6 md:p-8 lg:p-12 relative bg-white" id="login-panel">
+<div class="w-full max-w-sm bg-[#FFD700] p-8 md:p-10 rounded-[2.5rem] floating-card relative -translate-x-0 md:-translate-x-12 z-20 transition-transform duration-500 hover:-translate-y-2">
+<header class="mb-8">
+<h1 class="quirky-title text-5xl md:text-6xl text-black mb-2">Jump In!</h1>
+<p class="font-semibold text-black/70">Welcome back, data explorer.</p>
+</header>
+<div id="login-err" class="hidden mb-4 p-3 bg-red-50 border-2 border-red-500 border-dashed text-red-700 font-bold rounded-xl text-sm"></div>
+<form onsubmit="doLogin(event)" class="space-y-6">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold tracking-widest uppercase text-black ml-1">YOUR WORK EMAIL</label>
+<input id="l-email" class="w-full bg-white/50 border-3 border-black rounded-2xl h-14 px-5 font-semibold text-lg focus:ring-0 focus:bg-white focus:border-black placeholder-black/30 transition-all" placeholder="hello@adventure.com" required type="email"/>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold tracking-widest uppercase text-black ml-1">SECRET PASSWORD</label>
+<input id="l-pass" class="w-full bg-white/50 border-3 border-black rounded-2xl h-14 px-5 font-semibold text-lg focus:ring-0 focus:bg-white focus:border-black placeholder-black/30 transition-all" placeholder="••••••••" required type="password"/>
+</div>
+<div class="pt-4">
+<button class="w-full bg-black text-white rounded-2xl h-16 quirky-title text-xl tracking-widest hover:bg-[#FF3366] hover:scale-[1.02] transition-all flex items-center justify-center gap-3 shadow-xl" type="submit">
+LET'S GO! <span class="material-symbols-outlined">rocket_launch</span>
+</button>
+</div>
+</form>
+<div class="mt-8 space-y-3 text-center">
+<a class="block text-sm font-bold text-black underline underline-offset-4 decoration-2 hover:text-[#FF3366]" href="#forgot-password">Lost your key? (Forgot password)</a>
+<a class="block text-sm font-bold bg-white/40 py-3 rounded-xl border-2 border-dashed border-black hover:bg-white transition-colors" href="#signup">No account? <span class="text-[#FF3366]">Start your journey →</span></a>
+</div>
+<div class="absolute -bottom-4 -right-4 w-12 h-12 bg-[#3366FF] rounded-full border-4 border-black hidden md:flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-sm">waving_hand</span>
+</div>
+</div>
+</section>
+</main>`;
+    }
+
+    function renderSignup() {
+      app.innerHTML = `
+<main class="flex flex-col md:flex-row min-h-screen relative overflow-hidden">
+<section class="w-full md:w-[70%] bg-[#FFEFD5] relative flex flex-col items-center justify-center p-8 md:p-12 lg:p-20 overflow-hidden" id="illustration-panel">
+<div class="absolute -top-20 -left-20 w-64 h-64 bg-[#3366FF]/20 blob-shape"></div>
+<div class="absolute -bottom-32 -right-10 w-96 h-96 bg-[#FF3366]/10 blob-shape"></div>
+<div class="absolute top-10 left-10 flex items-center gap-3 z-10 cursor-pointer" onclick="location.hash='landing'">
+<div class="w-12 h-12 bg-black rounded-2xl flex items-center justify-center rotate-6">
+<span class="material-symbols-outlined text-white text-3xl">folder_managed</span>
+</div>
+<span class="quirky-title text-2xl tracking-wider">FileAI</span>
+</div>
+<div class="relative w-full max-w-2xl z-10">
+<div class="relative">
+<img alt="Abstract playful data journey" class="w-full h-auto object-cover rounded-[3rem] border-8 border-white shadow-2xl rotate-[-2deg]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0rEmfieN0wgeBjGFuTO0Yw8ASlE9JkBuREc_Id4Bvmmzp1oGk4sfwmnLXwbuDSu07QT9JYnUV57aNE6TzFE4tNeeIXDKegPbNz3tLuXHBitJmdkM64MsTLGyqfkrYBabsTcUN7wSDuyCjnjx9_qfoVmYj0gMl_hkAreQ7-yqK7lqo4LxS0Y8bRigobqRmsLAxb08BCx-58mkV1RSD3AkgpksRoUh15GbDNZHIm1GCtw76LcXLjNbCkqktd-DGDq4lHu-rVi988mY"/>
+<div class="absolute -top-8 -right-8 w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg animate-bounce duration-[3000ms]">
+<span class="material-symbols-outlined text-4xl text-black">person_add</span>
+</div>
+<div class="absolute -bottom-6 -left-10 bg-white p-6 rounded-3xl shadow-xl max-w-xs rotate-[4deg] border-2 border-slate-100">
+<p class="text-xl font-bold leading-tight">"Every big adventure starts with a single click!"</p>
+</div>
+</div>
+</div>
+</section>
+<section class="w-full md:w-[30%] flex items-center justify-center p-6 md:p-8 lg:p-12 relative bg-white" id="form-panel">
+<div class="w-full max-w-sm bg-[#FFD700] p-8 md:p-10 rounded-[2.5rem] floating-card relative md:-translate-x-12 z-20 transition-transform duration-500 hover:-translate-y-2">
+<header class="mb-8">
+<h1 class="quirky-title text-4xl md:text-5xl text-black mb-2 leading-none">Join the Fun!</h1>
+<p class="font-semibold text-black/70">Start your adventure today.</p>
+</header>
+<form onsubmit="event.preventDefault(); location.hash='login'" class="space-y-4">
+<div class="flex flex-col gap-1.5">
+<label class="text-[10px] font-bold tracking-widest uppercase text-black ml-1">YOUR WORK EMAIL</label>
+<input class="w-full bg-white/50 border-3 border-black rounded-xl h-12 px-4 font-semibold text-base focus:ring-0 focus:bg-white focus:border-black placeholder-black/30 transition-all" placeholder="hello@adventure.com" required type="email"/>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="text-[10px] font-bold tracking-widest uppercase text-black ml-1">CREATE PASSWORD</label>
+<input class="w-full bg-white/50 border-3 border-black rounded-xl h-12 px-4 font-semibold text-base focus:ring-0 focus:bg-white focus:border-black placeholder-black/30 transition-all" placeholder="••••••••" required type="password"/>
+</div>
+<div class="pt-4">
+<button class="w-full bg-black text-white rounded-2xl h-16 quirky-title text-lg tracking-widest hover:bg-[#FF3366] hover:scale-[1.02] transition-all flex items-center justify-center gap-3 shadow-xl" type="submit">
+CREATE ACCOUNT! <span class="material-symbols-outlined">potted_plant</span>
+</button>
+</div>
+</form>
+<div class="mt-6 text-center">
+<a href="#login" class="block text-sm font-bold bg-white/40 py-3 rounded-xl border-2 border-dashed border-black hover:bg-white transition-colors">Already a member? <span class="text-[#FF3366]">Log In →</span></a>
+</div>
+<div class="absolute -bottom-4 -right-4 w-12 h-12 bg-[#3366FF] rounded-full border-4 border-black hidden md:flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-xl">celebration</span>
+</div>
+</div>
+</section>
+</main>`;
+    }
+
+    function renderForgotPassword() {
+      app.innerHTML = `
+<main class="flex flex-col md:flex-row min-h-screen relative overflow-hidden">
+<section class="w-full md:w-[70%] bg-[#E0F7FA] relative flex flex-col items-center justify-center p-8 md:p-12 lg:p-20 overflow-hidden" id="illustration-panel">
+<div class="absolute -top-20 -right-20 w-80 h-80 bg-[#FFD700]/20 blob-shape rotate-45"></div>
+<div class="absolute -bottom-32 -left-10 w-96 h-96 bg-[#00D26A]/10 blob-shape"></div>
+<div class="absolute top-10 left-10 flex items-center gap-3 z-10 cursor-pointer" onclick="location.hash='landing'">
+<div class="w-12 h-12 bg-black rounded-2xl flex items-center justify-center rotate-[-6deg]">
+<span class="material-symbols-outlined text-white text-3xl">folder_managed</span>
+</div>
+<span class="quirky-title text-2xl tracking-wider">FileAI</span>
+</div>
+<div class="relative w-full max-w-2xl z-10">
+<div class="relative">
+<img alt="Minimalist modern architectural structure" class="w-full h-auto object-cover rounded-[3rem] border-8 border-white shadow-2xl rotate-[2deg]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDD3QFZHe8zkz6swSJ834Rp13lCmY_U9snRLEIil7VE0o88JLO9WeS8PNnsze7gVU9KFTn2SM6o7v6nBCNZQ6r_jpf7wnY5nZtEhB-Zxy_BoN3XWq3wvWuI38JdiYdPhAw8mxjnxkdhRmwJWjPwyup4LQxtdKnDJkLIYWwz6ZXvWBR3FG96odbGBIVILIBcNszeTDDfutN8hjiOmykMXKakjBMoyhThDd1Zr7kMXQssj-ArS4BBxbFp05z9NqU7erQ0yPUBj6SA48"/>
+<div class="absolute -top-10 -left-6 w-24 h-24 bg-[#FF3366] rounded-full flex items-center justify-center shadow-lg animate-pulse">
+<span class="material-symbols-outlined text-4xl text-white">search_check</span>
+</div>
+<div class="absolute -bottom-10 -right-4 bg-white p-6 rounded-3xl shadow-xl max-w-xs rotate-[-3deg] border-2 border-slate-100">
+<p class="text-xl font-bold leading-tight text-slate-800">"Don't worry, even the best explorers take a wrong turn!"</p>
+</div>
+</div>
+</div>
+</section>
+<section class="w-full md:w-[30%] flex items-center justify-center p-6 md:p-8 lg:p-12 relative bg-white" id="forgot-password-panel">
+<div class="w-full max-w-sm bg-[#00D26A] p-8 md:p-10 rounded-[2.5rem] floating-card relative -translate-x-0 md:-translate-x-12 z-20 transition-transform duration-500 hover:-translate-y-2">
+<header class="mb-8">
+<h1 class="quirky-title text-5xl md:text-5xl lg:text-6xl text-black leading-none mb-4">Find Your Way!</h1>
+<p class="font-semibold text-black/80">Tell us where to send the map.</p>
+</header>
+<form onsubmit="event.preventDefault(); alert('Reset link sent!'); location.hash='login';" class="space-y-6">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold tracking-widest uppercase text-black ml-1">YOUR WORK EMAIL</label>
+<div class="relative">
+<input class="w-full bg-white/50 border-3 border-black rounded-2xl h-14 px-5 font-semibold text-lg focus:ring-0 focus:bg-white focus:border-black placeholder-black/30 transition-all" placeholder="hello@lost-and-found.com" required type="email"/>
+</div>
+</div>
+<div class="pt-4">
+<button class="w-full bg-black text-white rounded-2xl h-16 quirky-title text-lg tracking-widest hover:bg-[#3366FF] hover:scale-[1.02] transition-all flex items-center justify-center gap-3 shadow-xl" type="submit">
+SEND RESET LINK! <span class="material-symbols-outlined">key</span>
+</button>
+</div>
+</form>
+<div class="mt-8 space-y-4 text-center">
+<a href="#login" class="block text-sm font-bold text-black underline underline-offset-4 decoration-2 hover:text-white transition-colors">Remembered your key? Back to Log In</a>
+<div class="pt-4">
+<a href="#signup" class="block text-sm font-bold bg-white/30 py-3 px-4 rounded-xl border-2 border-dashed border-black hover:bg-white transition-all text-black">New here? <span class="text-[#FF3366]">Create an account →</span></a>
+</div>
+</div>
+<div class="absolute -bottom-4 -right-4 w-12 h-12 bg-[#FF3366] rounded-full border-4 border-black hidden md:flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-sm">explore</span>
+</div>
+</div>
+</section>
+</main>`;
+    }
+
+    async function doLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('l-email').value.trim();
+      const pass = document.getElementById('l-pass').value.trim();
+      const err = document.getElementById('login-err');
+      err.classList.add('hidden');
+      const res = await api('POST', '/api/login', { email, password: pass });
+      if (res.error) { err.textContent = res.error; err.classList.remove('hidden'); return; }
+      state.user = res.user;
+      location.hash = 'dashboard';
+    }
+
+    // ── DASHBOARD ─────────────────────────────────────────────────────────────
+    function renderDashboard() {
+      const u = state.user || {};
+      app.innerHTML = shellWrap('dashboard', 'Dashboard', 'Dashboard', `
+    <div class="max-w-5xl space-y-6">
+      <!-- Welcome -->
+      <section class="swiss p-8 bg-white flex items-start justify-between">
+        <div>
+          <h1 class="font-serif text-2xl font-bold">Welcome, ${u.name || 'John Doe'}</h1>
+          <p class="font-mono text-[11px] text-primary font-bold uppercase mt-1">AI-Based Smart File Assistant</p>
+          <p class="text-sm text-slate-600 mt-3 max-w-xl leading-relaxed">This system answers questions about enterprise technology standards. All documents are preloaded — simply go to AI Chat Assistant and start asking questions.</p>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <span class="font-mono text-[11px] text-slate-500">${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+          <span class="swiss px-2 py-1 font-mono text-[10px] font-bold uppercase">SESSION ACTIVE</span>
+        </div>
+      </section>
+      <!-- Notice -->
+      <section class="swiss bg-[#F4F4F5] p-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-primary">info</span>
+          <div>
+            <p class="text-[12px] font-bold uppercase">READ-ONLY SYSTEM</p>
+            <p class="font-mono text-[11px] text-slate-600">All documents are preloaded. No upload needed. System monitoring active.</p>
+          </div>
+        </div>
+        <a href="#chat" class="swiss px-4 py-1 text-[11px] font-bold uppercase hover:bg-black hover:text-white transition-colors">Go to Chat</a>
+      </section>
+      <!-- Domain -->
+      <section class="swiss">
+        <div class="bg-black text-white px-4 py-2 text-[13px] font-bold uppercase tracking-[0.2em]">DOMAIN SELECTED</div>
+        <div class="p-6">
+          <p class="font-serif text-xl font-bold">Enterprise &amp; Global Technology Standards Documentation</p>
+          <div class="mt-4 flex flex-col divide-y divide-slate-100">
+            ${['NIST Cybersecurity Framework', 'NIST AI Security Guidelines', 'Enterprise IoT Security Framework', 'Cloud Computing Standards'].map(d => `<div class="py-2 font-mono text-sm flex justify-between items-center"><span>${d}</span><span class="text-slate-400">→</span></div>`).join('')}
+          </div>
+        </div>
+      </section>
+      <!-- Source Cards Grid -->
+      <section>
+        <p class="text-[11px] uppercase font-bold tracking-widest text-slate-400 mb-3">PRELOADED BACKEND DOCUMENTS</p>
+        <div class="grid grid-cols-2 border-t border-l border-black" id="dash-cards">
+          ${[
+          { t: 'NIST Cybersecurity Framework', c: 'GOVERNANCE', d: 'Standards for managing cybersecurity risk across critical infrastructure.', p: '204 pages' },
+          { t: 'Enterprise IoT Security Framework', c: 'IOT SECURITY', d: 'Security architecture for industrial IoT edge connectivity.', p: '156 pages' },
+          { t: 'NIST AI Security Profile', c: 'AI GOVERNANCE', d: 'AI risk management guidance for enterprise-grade AI systems.', p: '98 pages' },
+          { t: 'Cloud Computing Standards', c: 'CLOUD', d: 'Roadmap for enterprise cloud interoperability and data portability.', p: '212 pages' }
+        ].map(c => `<div class="p-6 border-r border-b border-black bg-white hover:bg-slate-50 transition-colors">
+            <div class="flex justify-between items-start mb-3">
+              <span class="swiss px-2 py-0.5 font-mono text-[9px] font-bold uppercase">${c.c}</span>
+            </div>
+            <h4 class="font-bold text-base mb-1">${c.t}</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">${c.d}</p>
+            <p class="font-mono text-[10px] text-slate-400 mt-3">${c.p} · Indexed</p>
+          </div>`).join('')}
+        </div>
+      </section>
+      <!-- Quick Start -->
+      <section class="swiss">
+        <div class="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest">QUICK START</div>
+        ${[
+          ['01', 'Navigate to AI Chat Assistant'],
+          ['02', 'Type a question about enterprise technology standards'],
+          ['03', 'The system retrieves answers from backend documents automatically']
+        ].map(([n, s]) => `<div class="flex items-center gap-6 px-6 py-4 border-b border-slate-100 last:border-0">
+          <span class="font-mono text-2xl font-black text-slate-300">${n}</span>
+          <p class="text-sm">${s}</p>
+          <span class="ml-auto text-slate-400">→</span>
+        </div>`).join('')}
+      </section>
+    </div>`);
+    }
+
+    // ── CHAT ──────────────────────────────────────────────────────────────────
+    let chatHistory = [];
+
+    async function renderChat() {
+      app.innerHTML = shellWrap('chat', 'AI Chat Assistant', 'AI Chat Assistant', `
+    <div class="flex -mx-8 -mt-8 h-[calc(100vh-64px-0px)]" style="height:calc(100vh - 64px)">
+      <!-- Left History Panel -->
+      <div class="w-72 border-r border-black flex flex-col bg-white flex-shrink-0">
+        <div class="bg-black text-white px-6 py-3 text-[10px] font-bold uppercase tracking-widest">HISTORY</div>
+        <div id="chat-hist-list" class="flex-1 overflow-y-auto flex flex-col"></div>
+        <button onclick="clearChat()" class="m-4 swiss py-2 text-[11px] font-bold uppercase hover:bg-black hover:text-white transition-colors">+ New Chat</button>
+      </div>
+      <!-- Right Chat -->
+      <div class="flex-1 flex flex-col bg-white min-w-0">
+        <div class="px-8 py-3 border-b border-black flex items-center justify-between flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold uppercase">AI Document Assistant</span>
+            <span class="bg-black text-white font-mono text-[9px] px-2 py-0.5 uppercase tracking-wider">BACKEND DOCS ONLY</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+            <span class="font-mono text-[10px] text-slate-500 uppercase">System Online</span>
+          </div>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-8 space-y-6"></div>
+        <!-- Input -->
+        <div class="p-6 border-t border-black flex-shrink-0">
+          <div class="swiss flex items-end bg-white">
+            <textarea id="chat-input" rows="2" placeholder="Ask a question about enterprise technology standards..." class="flex-1 border-0 focus:ring-0 px-4 py-3 text-sm font-mono resize-none outline-none bg-transparent placeholder:text-slate-300"></textarea>
+            <button onclick="sendChat()" class="bg-black text-white px-6 py-3 font-mono text-xs font-bold uppercase hover:bg-primary transition-colors self-stretch">SEND →</button>
+          </div>
+          <p class="font-mono text-[9px] text-slate-400 mt-2 uppercase">Press the button or Enter to send</p>
+        </div>
+      </div>
+    </div>`);
+
+      // Load history from server
+      const res = await api('GET', '/api/chat/history');
+      chatHistory = res.history || [];
+      renderChatMessages();
+      renderChatHistoryList();
+
+      // Enter key shortcut
+      document.getElementById('chat-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+      });
+    }
+
+    function renderChatMessages() {
+      const el = document.getElementById('chat-messages');
+      if (!el) return;
+      if (!chatHistory.length) {
+        el.innerHTML = `<div class="flex flex-col items-center justify-center h-full gap-4">
+      <div class="swiss p-8 max-w-md text-center border-dashed">
+        <span class="material-symbols-outlined text-5xl text-slate-300">chat</span>
+        <p class="font-serif text-lg mt-2">Start a new conversation</p>
+        <p class="font-mono text-[11px] text-slate-500 mt-1">Answering from ${state.docsCount} preloaded backend documents</p>
+      </div>
+      <div class="w-full max-w-md flex flex-col swiss divide-y divide-slate-100">
+        ${['What is the NIST Cybersecurity Framework?', 'Explain enterprise IoT security standards', 'What are AI cybersecurity governance risks?']
+            .map(q => `<button onclick="askSuggestion('${q.replace(/'/g, "\\'")} ')" class="px-4 py-3 font-mono text-[11px] text-left hover:bg-slate-50 transition-colors">${q} →</button>`).join('')}
+      </div>
+    </div>`;
+        return;
+      }
+
+      function parseMarkdown(text) {
+        if (!text) return '';
+        return text
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/^###### (.*?)$/gm, '<h6 class="font-bold text-[11px] mt-2 mb-1 uppercase tracking-widest text-slate-500">$1</h6>')
+          .replace(/^##### (.*?)$/gm, '<h5 class="font-bold text-[12px] mt-2 mb-1 uppercase tracking-wider text-slate-600">$1</h5>')
+          .replace(/^#### (.*?)$/gm, '<h4 class="font-bold text-[13px] mt-3 mb-1 uppercase text-slate-800">$1</h4>')
+          .replace(/^### (.*?)$/gm, '<h3 class="font-bold text-[15px] mt-4 mb-1">$1</h3>')
+          .replace(/^## (.*?)$/gm, '<h2 class="font-bold text-base mt-5 mb-2">$1</h2>')
+          .replace(/^# (.*?)$/gm, '<h1 class="font-serif font-bold text-lg mt-5 mb-2">$1</h1>')
+          .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
+          .replace(/`(.*?)`/g, '<code class="bg-slate-100 text-primary px-1 py-0.5 font-mono text-[11px]">$1</code>')
+          .replace(/\(?\[([^\]]+)\]\)?/g, function (match, inner) {
+            if (inner.toLowerCase().includes('.pdf') || inner.toLowerCase().includes('pg ') || inner.toLowerCase().includes('p.')) {
+              return `<span class="inline-block bg-slate-100 border border-slate-200 text-slate-500 font-mono text-[9px] px-1.5 py-0.5 rounded-[3px] uppercase tracking-wider ml-1 shadow-sm align-middle">${inner}</span>`;
+            }
+            return match;
+          })
+          .replace(/\n/g, '<br>');
+      }
+
+      el.innerHTML = chatHistory.map((m, i) => {
+        if (m.role === 'user') {
+          return `<div class="flex flex-col items-end">
+        <div class="max-w-[70%] bg-black text-white px-5 py-3 font-mono text-xs leading-relaxed">${m.content}</div>
+        <span class="font-mono text-[9px] text-slate-400 mt-1">${m.ts || ''}</span>
+      </div>`;
+        }
+        const srcs = (m.sources || []).map(s => `<div class="flex items-center gap-2 py-1 border-b border-slate-100 last:border-0">
+      <span class="material-symbols-outlined text-xs">link</span>
+      <span class="font-mono text-[10px]">${s.file} · Pages: ${(s.pages || []).join(', ')}</span>
+    </div>`).join('');
+        const confBadge = m.confidence ? `<span class="bg-primary/10 border border-primary/30 text-primary font-mono text-[9px] px-1.5 font-bold">${m.confidence}% CONFIDENCE</span>` : '';
+        const srcBlock = srcs ? `<div class="mt-4 swiss">
+      <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between px-3 py-2 bg-slate-50 text-[10px] font-bold uppercase font-mono hover:bg-slate-100">
+        <div class="flex items-center gap-2">SOURCES ${confBadge}</div>
+        <span class="material-symbols-outlined text-sm">expand_more</span>
+      </button>
+      <div class="hidden px-3 py-2">${srcs}</div>
+    </div>` : '';
+        const parsedContent = m.isHTML ? m.content : (m.role === 'assistant' ? parseMarkdown(m.content) : m.content.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+
+        const copyButtonHTML = (!m.isHTML && m.role === 'assistant') ?
+          `<button id="btn-copy-${i}" onclick="copyMessage(${i})" class="flex items-center gap-1.5 text-slate-400 hover:text-black transition-colors" title="Copy text">
+            <span class="material-symbols-outlined text-[12px]">content_copy</span>
+            <span class="font-mono text-[9px] font-bold uppercase tracking-wider">Copy</span>
+          </button>` : '';
+
+        return `<div class="flex flex-col items-start w-full">
+      <div class="max-w-[85%] swiss bg-white px-5 py-4 text-sm leading-relaxed">${parsedContent}${srcBlock}</div>
+      <div class="flex items-center gap-4 mt-2">
+        <span class="font-mono text-[9px] text-slate-400">${m.ts || ''}</span>
+        ${copyButtonHTML}
+      </div>
+    </div>`;
+      }).join('');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function copyMessage(idx) {
+      const msg = chatHistory[idx];
+      if (!msg) return;
+      try {
+        await navigator.clipboard.writeText(msg.content);
+        const btn = document.getElementById('btn-copy-' + idx);
+        if (btn) {
+          const originalHTML = btn.innerHTML;
+          btn.innerHTML = '<span class="material-symbols-outlined text-[12px] text-green-600">check</span><span class="font-mono text-[9px] font-bold uppercase tracking-wider text-green-600">Copied</span>';
+          setTimeout(() => btn.innerHTML = originalHTML, 2000);
+        }
+      } catch (err) { }
+    }
+
+    function renderChatHistoryList() {
+      const el = document.getElementById('chat-hist-list');
+      if (!el) return;
+      const userMsgs = chatHistory.filter(m => m.role === 'user');
+      if (!userMsgs.length) { el.innerHTML = `<p class="px-6 py-4 font-mono text-[10px] text-slate-400">No history yet</p>`; return; }
+      el.innerHTML = userMsgs.map((m, i) => `<div class="${i === userMsgs.length - 1 ? 'border-l-[3px] border-primary bg-[#F4F4F5]' : ''} px-5 py-3 border-b border-slate-100 cursor-pointer hover:bg-slate-50">
+    <p class="font-mono text-[11px] truncate">${m.content}</p>
+    <p class="font-mono text-[9px] text-slate-400 mt-1">${m.ts || ''}</p>
+  </div>`).join('');
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const q = input.value.trim();
+      if (!q) return;
+      input.value = '';
+      const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+      // Push user message
+      chatHistory.push({ role: 'user', content: q, ts });
+      renderChatMessages();
+      renderChatHistoryList();
+
+      // Push initial assistant loading message
+      const assistantMsg = {
+        role: 'assistant',
+        content: '<span class="font-mono text-[11px] text-slate-400 animate-pulse">Searching documents...</span>',
+        ts,
+        sources: [],
+        isHTML: true
+      };
+      chatHistory.push(assistantMsg);
+      renderChatMessages();
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: q, stream: true }),
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP Error: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let isFirstChunk = true;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || ""; // Keep the incomplete chunk in the buffer
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6);
+              try {
+                const data = JSON.parse(dataStr);
+
+                if (data.type === 'meta') {
+                  if (data.error) {
+                    assistantMsg.content = `<span class="text-red-600">${data.error}</span>`;
+                  } else {
+                    assistantMsg.content = ""; // Clear loading message
+                    assistantMsg.isHTML = false;
+                    assistantMsg.sources = data.sources || [];
+                    assistantMsg.confidence = data.confidence || 0;
+                  }
+                  renderChatMessages();
+                }
+                else if (data.type === 'chunk') {
+                  if (isFirstChunk) {
+                    assistantMsg.content = ""; // Ensure loading text is cleared
+                    assistantMsg.isHTML = false;
+                    isFirstChunk = false;
+                  }
+                  assistantMsg.content += data.text;
+                  renderChatMessages();
+                }
+                else if (data.type === 'done') {
+                  assistantMsg.confidence = data.confidence;
+                  renderChatMessages();
+                  renderChatHistoryList();
+                }
+                else if (data.type === 'error') {
+                  assistantMsg.content += `\n\n<span class="text-red-600">Error: ${data.error}</span>`;
+                  assistantMsg.isHTML = true;
+                  renderChatMessages();
+                }
+              } catch (e) {
+                console.error("Error parsing SSE data", e, dataStr);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Chat error:", err);
+        chatHistory.pop();
+        chatHistory.push({ role: 'assistant', content: `<span class="text-red-600">Connection error: ${err.message}</span>`, ts, sources: [], isHTML: true });
+        renderChatMessages();
+      }
+      renderChatHistoryList();
+    }
+
+    function askSuggestion(q) { document.getElementById('chat-input').value = q; sendChat(); }
+
+    async function clearChat() {
+      await api('DELETE', '/api/chat/history');
+      chatHistory = [];
+      renderChatMessages();
+      renderChatHistoryList();
+    }
+
+    // ── INSIGHTS ──────────────────────────────────────────────────────────────
+    async function renderInsights() {
+      app.innerHTML = shellWrap('insights', 'Key Insights', 'Key Insights', '<div class="max-w-5xl"><p class="font-mono text-xs text-slate-400 animate-pulse">Loading insights...</p></div>');
+      const data = await api('GET', '/api/insights');
+      const concepts = (data.concepts || []);
+      const highlights = (data.highlights || []);
+
+      const cards = [
+        { bg: 'bg-white text-black', border: 'border-black' },
+        { bg: 'bg-black text-white', border: 'border-black' },
+        { bg: 'bg-white text-black', border: 'border-black' },
+        { bg: 'bg-white text-black', border: 'border-black' }
+      ];
+
+      app.innerHTML = shellWrap('insights', 'Key Insights', 'Key Insights', `
+    <div class="max-w-5xl space-y-10">
+      <section>
+        <div class="flex items-center gap-4 mb-4">
+          <p class="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">KEY CONCEPTS</p>
+          <div class="flex-1 h-px bg-black"></div>
+        </div>
+        <div class="grid grid-cols-2 border-t border-l border-black">
+          ${concepts.map((c, i) => {
+        const s = cards[i % 4];
+        const tagBorder = s.bg === 'bg-black' ? 'border-white text-white' : 'border-black text-black';
+        return `<div class="p-8 border-r border-b border-black ${s.bg} flex flex-col justify-between min-h-[200px]">
+              <div>
+                <h3 class="font-serif text-2xl font-bold italic mb-3">${c.title}</h3>
+                <p class="text-sm leading-relaxed opacity-80">${c.description}</p>
+              </div>
+              <div class="flex flex-wrap gap-2 mt-4">
+                ${(c.tags || []).map(t => `<span class="border ${tagBorder} px-2 py-0.5 font-mono text-[9px] font-bold uppercase">${t}</span>`).join('')}
+              </div>
+            </div>`;
+      }).join('')}
+        </div>
+      </section>
+      <section>
+        <div class="flex items-center gap-4 mb-4">
+          <p class="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">IMPORTANT HIGHLIGHTS</p>
+          <div class="flex-1 h-px bg-black"></div>
+        </div>
+        <div class="flex flex-col gap-4">
+          ${highlights.map(h => `<div class="swiss bg-white">
+            <div class="h-1 w-full bg-black"></div>
+            <div class="p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <p class="font-serif italic text-xl max-w-2xl leading-snug">"${h.insight}"</p>
+              <div class="flex flex-col items-end gap-2 flex-shrink-0">
+                <span class="font-mono text-[10px] text-slate-500 uppercase">${h.source}</span>
+                <span class="swiss px-2 py-0.5 font-mono text-[9px] font-bold uppercase">${h.tag}</span>
+              </div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </section>
+    </div>`);
+    }
+
+    // ── DOCUMENTS ─────────────────────────────────────────────────────────────
+    async function renderDocuments() {
+      app.innerHTML = shellWrap('documents', 'Document Explorer', 'Document Explorer', '<p class="font-mono text-xs text-slate-400 animate-pulse">Loading documents...</p>');
+      const data = await api('GET', '/api/documents');
+      const docs = data.documents || [];
+
+      app.innerHTML = shellWrap('documents', 'Document Explorer', 'Document Explorer', `
+    <div class="max-w-4xl space-y-4">
+      <div class="flex items-center justify-between">
+        <p class="text-sm text-slate-500">Explore backend knowledge base documents powering the AI.</p>
+        <span class="swiss px-3 py-1 font-mono text-[10px] font-bold uppercase">${docs.length} DOCUMENTS LOADED</span>
+      </div>
+      <div class="swiss bg-[#F4F4F5] p-4 flex items-center gap-3">
+        <span class="material-symbols-outlined text-primary text-[18px]">info</span>
+        <p class="text-sm text-slate-600">These documents are preloaded and managed by the backend. Users cannot add or remove documents.</p>
+      </div>
+      <div class="swiss flex items-center">
+        <span class="material-symbols-outlined px-3 text-slate-400">search</span>
+        <input id="doc-search" oninput="filterDocs()" placeholder="Search documents by name or topic..." class="flex-1 h-10 border-0 outline-none font-mono text-sm focus:ring-0 bg-white"/>
+      </div>
+      <div id="doc-list" class="flex flex-col swiss divide-y divide-black">
+        ${docs.map(d => docCard(d)).join('')}
+      </div>
+    </div>`);
+    }
+
+    function docCard(d) {
+      const tags = (d.topics || []).map(t => `<span class="swiss px-2 py-0.5 font-mono text-[9px] font-bold uppercase">${t}</span>`).join('');
+      return `<div class="flex items-start gap-6 p-6 bg-white hover:bg-slate-50 transition-colors doc-item" data-name="${(d.title || d.filename || '').toLowerCase()}">
+    <div class="swiss w-12 h-12 flex items-center justify-center flex-shrink-0">
+      <span class="material-symbols-outlined text-[22px]">description</span>
+    </div>
+    <div class="flex-1 min-w-0">
+      <h4 class="font-serif font-bold text-base">${d.title || d.filename}</h4>
+      <p class="text-sm text-slate-500 mt-1 leading-relaxed">${d.summary || ''}</p>
+      <div class="flex flex-wrap gap-2 mt-2">${tags}</div>
+    </div>
+    <div class="flex flex-col items-end gap-2 flex-shrink-0 text-right">
+      <span class="font-mono text-[11px] text-slate-400">${d.pages || '--'} pages</span>
+      <div class="flex items-center gap-2 mt-1">
+        <button onclick="window.open('/api/raw_documents/${d.filename}', '_blank')" class="flex items-center gap-1 text-slate-400 hover:text-black transition-colors" title="Open PDF in new tab">
+          <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+          <span class="font-mono text-[9px] font-bold uppercase tracking-wider">Open</span>
+        </button>
+        <span class="border border-black px-2 py-0.5 font-mono text-[9px] font-bold uppercase">SYSTEM LOADED</span>
+      </div>
+    </div>
+  </div>`;
+    }
+
+    function filterDocs() {
+      const q = document.getElementById('doc-search').value.toLowerCase();
+      document.querySelectorAll('.doc-item').forEach(el => {
+        el.style.display = el.dataset.name.includes(q) ? '' : 'none';
+      });
+    }
+
+    // ── FAQ ────────────────────────────────────────────────────────────────────
+    async function renderFAQ() {
+      app.innerHTML = shellWrap('faq', 'FAQ', 'FAQ', '<p class="font-mono text-xs text-slate-400 animate-pulse">Loading FAQ...</p>');
+      const data = await api('GET', '/api/faq');
+      const items = data.faq || [];
+
+      app.innerHTML = shellWrap('faq', 'FAQ', 'FAQ', `
+    <div class="max-w-3xl">
+      <h3 class="font-serif text-2xl font-bold mb-1">Frequently Asked Questions</h3>
+      <p class="text-sm text-slate-500 mb-6">Common questions about enterprise technology standards and this system.</p>
+      <div class="swiss divide-y divide-black">
+        ${items.map(item => `<details class="group" ${item.open ? 'open' : ''}>
+          <summary class="flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors">
+            <span class="text-sm font-bold uppercase tracking-tight">${item.q}</span>
+            <span class="material-symbols-outlined transition-transform group-open:rotate-180 text-xl flex-shrink-0 ml-4">expand_more</span>
+          </summary>
+          <div class="px-6 pb-5 text-sm leading-relaxed text-slate-700 bg-[#F4F4F5] border-t border-black">${item.a}</div>
+        </details>`).join('')}
+      </div>
+    </div>`);
+    }
+
+    // ── HISTORY ────────────────────────────────────────────────────────────────
+    async function renderHistory() {
+      app.innerHTML = shellWrap('history', 'Search History', 'Search History', '<p class="font-mono text-xs text-slate-400 animate-pulse">Loading history...</p>');
+      const data = await api('GET', '/api/search-history');
+      const hist = (data.history || []).slice().reverse();
+
+      app.innerHTML = shellWrap('history', 'Search History', 'Search History', `
+    <div class="max-w-5xl">
+      <div class="flex items-center justify-between mb-5">
+        <p class="text-sm text-slate-500">All past queries from this session.</p>
+        <button onclick="clearHistory()" class="swiss px-4 py-1 font-mono text-[11px] font-bold uppercase hover:bg-black hover:text-white transition-colors">CLEAR ALL HISTORY</button>
+      </div>
+      <div class="swiss overflow-hidden">
+        <table class="w-full">
+          <thead>
+            <tr class="bg-black text-white">
+              <th class="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-wider w-8">#</th>
+              <th class="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-wider">QUERY</th>
+              <th class="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-wider w-36">DATE &amp; TIME</th>
+              <th class="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-wider">SOURCES USED</th>
+            </tr>
+          </thead>
+          <tbody id="hist-body">
+            ${hist.length ? hist.map((h, i) => `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+              <td class="px-4 py-3 font-mono text-[11px] text-slate-400">${hist.length - i}</td>
+              <td class="px-4 py-3 font-mono text-[11px] max-w-xs truncate">${h.query}</td>
+              <td class="px-4 py-3 font-mono text-[11px] text-slate-500">${h.date}</td>
+              <td class="px-4 py-3 font-mono text-[10px] text-slate-500">${h.sources || '—'}</td>
+            </tr>`).join('') : `<tr><td colspan="4" class="px-4 py-12 text-center font-serif italic text-slate-400">No search history yet.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>`);
+    }
+
+    async function clearHistory() {
+      await api('DELETE', '/api/search-history');
+      renderHistory();
+    }
+
+    // ── SETTINGS ────────────────────────────────────────────────────────────────
+    async function renderSettings() {
+      const data = await api('GET', '/api/settings');
+      const s = data || state.settings;
+
+      app.innerHTML = shellWrap('settings', 'Settings', 'Settings', `
+    <div class="max-w-3xl space-y-6">
+      <!-- User Preferences -->
+      <div class="swiss">
+        <div class="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest">USER PREFERENCES</div>
+        <div class="divide-y divide-slate-100">
+          <div class="flex items-center justify-between px-6 py-4">
+            <span class="text-sm font-bold uppercase text-[11px] tracking-wider">Clear Chat History</span>
+            <button onclick="clearChatFromSettings()" class="swiss px-4 py-1 font-mono text-[11px] font-bold uppercase text-red-600 border-red-300 hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors">CLEAR ALL CHATS</button>
+          </div>
+          <div class="flex items-center justify-between px-6 py-4">
+            <span class="text-sm font-bold uppercase text-[11px] tracking-wider">Reset Preferences</span>
+            <button onclick="resetSettings()" class="swiss px-4 py-1 font-mono text-[11px] font-bold uppercase hover:bg-black hover:text-white transition-colors">RESET TO DEFAULTS</button>
+          </div>
+        </div>
+      </div>
+      <!-- Model Config -->
+      <div class="swiss">
+        <div class="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest">LANGUAGE MODEL CONFIGURATION</div>
+        <div class="p-6 grid grid-cols-2 gap-8">
+          <div>
+            <label class="block text-[10px] uppercase font-bold tracking-widest mb-2">SELECT MODEL</label>
+            <select id="s-model" class="w-full swiss border-black font-mono text-sm h-10 focus:ring-0 focus:border-black rounded-none">
+              ${['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o'].map(m => `<option ${m === s.model ? 'selected' : ''}>${m}</option>`).join('')}
+            </select>
+            <label class="block text-[10px] uppercase font-bold tracking-widest mt-5 mb-2">TEMPERATURE <span id="s-temp-val" class="font-mono text-primary">${s.temperature}</span></label>
+            <input id="s-temp" type="range" min="0" max="1" step="0.1" value="${s.temperature}" oninput="document.getElementById('s-temp-val').textContent=this.value" class="w-full accent-black"/>
+          </div>
+          <div>
+            <label class="block text-[10px] uppercase font-bold tracking-widest mb-2">MAX OUTPUT TOKENS <span id="s-tok-val" class="font-mono text-primary">${s.max_tokens}</span></label>
+            <input id="s-tok" type="range" min="100" max="4000" step="100" value="${s.max_tokens}" oninput="document.getElementById('s-tok-val').textContent=this.value" class="w-full accent-black mt-8"/>
+          </div>
+        </div>
+      </div>
+      <!-- Retrieval Config -->
+      <div class="swiss">
+        <div class="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest">RETRIEVAL CONFIGURATION</div>
+        <div class="p-6 grid grid-cols-2 gap-8">
+          <div>
+            <label class="block text-[10px] uppercase font-bold tracking-widest mb-2">NUMBER OF SOURCES (TOP-K) <span id="s-topk-val" class="font-mono text-primary">${s.top_k}</span></label>
+            <input id="s-topk" type="range" min="1" max="15" step="1" value="${s.top_k}" oninput="document.getElementById('s-topk-val').textContent=this.value" class="w-full accent-black mt-2"/>
+          </div>
+          <div class="swiss p-4 bg-[#F4F4F5]">
+            <p class="text-sm text-slate-600 leading-relaxed">Retrieving more sources provides richer context but uses more tokens per query.</p>
+          </div>
+        </div>
+      </div>
+      <div id="save-msg" class="hidden swiss border-green-500 bg-green-50 px-4 py-2 font-mono text-[11px] font-bold text-green-700 uppercase">✓ SETTINGS SAVED</div>
+      <button onclick="saveSettings()" class="w-full h-11 bg-black text-white font-mono text-[13px] uppercase tracking-widest hover:bg-primary transition-colors">SAVE SETTINGS</button>
+    </div>`);
+    }
+
+    async function saveSettings() {
+      const body = {
+        model: document.getElementById('s-model').value,
+        temperature: parseFloat(document.getElementById('s-temp').value),
+        max_tokens: parseInt(document.getElementById('s-tok').value),
+        top_k: parseInt(document.getElementById('s-topk').value)
+      };
+      await api('POST', '/api/settings', body);
+      Object.assign(state.settings, body);
+      const msg = document.getElementById('save-msg');
+      msg.classList.remove('hidden');
+      setTimeout(() => msg.classList.add('hidden'), 3000);
+    }
+
+    async function clearChatFromSettings() {
+      await api('DELETE', '/api/chat/history');
+      chatHistory = [];
+      alert('Chat history cleared.');
+    }
+
+    async function resetSettings() {
+      const defaults = { model: 'gpt-3.5-turbo', temperature: 0.3, max_tokens: 600, top_k: 5 };
+      await api('POST', '/api/settings', defaults);
+      renderSettings();
+    }
+
+    // ── PROFILE ────────────────────────────────────────────────────────────────
+    async function renderProfile() {
+      app.innerHTML = shellWrap('profile', 'Profile', 'Profile', '<p class="font-mono text-xs text-slate-400 animate-pulse">Loading profile...</p>');
+      const data = await api('GET', '/api/profile');
+      const u = data.user || state.user || {};
+      const stats = data.stats || {};
+
+      app.innerHTML = shellWrap('profile', 'Profile', 'Profile', `
+    <div class="max-w-3xl space-y-6">
+      <!-- User Info -->
+      <section class="swiss">
+        <div class="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest">USER IDENTIFICATION</div>
+        <div class="p-8 flex flex-col md:flex-row items-start gap-8">
+          <div class="w-20 h-20 bg-black flex items-center justify-center text-white font-mono text-2xl font-bold flex-shrink-0">${u.initials || 'JD'}</div>
+          <div class="flex-1 font-mono text-sm divide-y divide-slate-100 w-full">
+            ${[
+          ['FULL NAME', u.name || 'John Doe'],
+          ['EMAIL', u.email || '—'],
+          ['ROLE', u.role || 'RESEARCHER'],
+          ['ACCOUNT CREATED', u.created || '—']
+        ].map(([k, v]) => `<div class="flex py-2"><span class="w-40 text-slate-400 uppercase text-[10px] tracking-wider">${k}</span><span class="font-bold">${v}</span></div>`).join('')}
+          </div>
+        </div>
+      </section>
+      <!-- Stats -->
+      <section>
+        <p class="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400 mb-3">ACTIVITY STATISTICS</p>
+        <div class="grid grid-cols-3 border-t border-l border-black">
+          ${[
+          ['QUERIES ASKED', stats.queries_asked || 0],
+          ['DOCUMENTS REFERENCED', stats.documents_referenced || 0],
+          ['SEARCH HISTORY', stats.search_history_count || 0]
+        ].map(([l, v]) => `<div class="border-r border-b border-black p-8 bg-white">
+            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">${l}</p>
+            <p class="font-serif text-5xl font-black italic mt-4">${v}</p>
+          </div>`).join('')}
+        </div>
+      </section>
+      <!-- Danger Zone -->
+      <section class="border border-red-600">
+        <div class="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-red-600 border-b border-red-600">DANGER ZONE</div>
+        <div class="p-6 flex items-center justify-between">
+          <div>
+            <p class="font-black text-lg uppercase text-red-600 italic">Delete Account</p>
+            <p class="font-mono text-xs text-red-500 uppercase mt-1">Warning: Account deletion is irreversible. All data will be purged.</p>
+          </div>
+          <button class="px-8 py-3 border-2 border-red-600 text-red-600 font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-colors">Delete Account</button>
+        </div>
+      </section>
+    </div>`);
+    }
+  </script>
+</body>
+
+</html>

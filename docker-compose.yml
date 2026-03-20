@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  ai-file-assistant:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./embeddings_cache:/app/embeddings_cache
+    env_file:
+      - .env
+    restart: unless-stopped
