@@ -23,11 +23,11 @@ COPY . .
 # Create data directories
 RUN mkdir -p data/sample_pdfs data/chroma embeddings_cache
 
-# Expose API port (7860 for Hugging Face Spaces)
+# Expose API port
 EXPOSE 7860
 
 # Health check
 HEALTHCHECK CMD curl --fail http://localhost:7860/api/me || exit 1
 
 # Run the API server
-ENTRYPOINT ["python", "src/api_server.py"]
+ENTRYPOINT ["python", "api_server.py"]

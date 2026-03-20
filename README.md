@@ -4,13 +4,11 @@
 ![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/License-Educational-orange)
 
-An intelligent, AI-powered system built with Flask, OpenAI, and ChromaDB that allows users to upload documents (PDFs) in backend and ask questions about their content using natural language. This was developed as part of an **Infosys Internship Project**.
+An intelligent, AI-powered system built with Flask, OpenAI, and ChromaDB that allows users to upload documents (PDFs) and ask questions about their content using natural language. This was developed as part of an **Infosys Internship Project**.
 
 ---
 
 ## 🌟 Key Features
-
-[![Deploy to Hugging Face](https://huggingface.co/datasets/huggingface/badges/resolve/main/deploy-to-spaces-lg.svg)](https://huggingface.co/new-space?template=docker)
 
 *   **PDF Processing & Text Extraction**: Seamlessly extracts and processes text from multiple uploaded PDF documents.
 *   **Semantic Search**: Utilizes advanced vector similarity search (via ChromaDB) to retrieve the most relevant document chunks based on user queries.
