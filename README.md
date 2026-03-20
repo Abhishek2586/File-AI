@@ -4,7 +4,7 @@
 ![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/License-Educational-orange)
 
-An intelligent, AI-powered system built with Flask, OpenAI, and ChromaDB that allows users to upload documents (PDFs) and ask questions about their content using natural language. This was developed as part of an **Infosys Internship Project**.
+An intelligent, AI-powered system built with Flask, OpenAI, and ChromaDB that allows users to upload documents (PDFs) in backend and ask questions about their content using natural language. This was developed as part of an **Infosys Internship Project**.
 
 ---
 
