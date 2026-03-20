@@ -30,4 +30,4 @@ EXPOSE 5000
 HEALTHCHECK CMD curl --fail http://localhost:5000/api/me || exit 1
 
 # Run the API server
-ENTRYPOINT ["python", "api_server.py"]
+ENTRYPOINT ["python", "src/api_server.py"]

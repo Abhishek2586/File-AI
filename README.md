@@ -10,6 +10,9 @@ An intelligent, AI-powered system built with Flask, OpenAI, and ChromaDB that al
 
 ## 🌟 Key Features
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+
 *   **PDF Processing & Text Extraction**: Seamlessly extracts and processes text from multiple uploaded PDF documents.
 *   **Semantic Search**: Utilizes advanced vector similarity search (via ChromaDB) to retrieve the most relevant document chunks based on user queries.
 *   **AI-Powered Q&A**: Employs OpenAI's GPT models (GPT-3.5-turbo / GPT-4) to generate accurate, context-aware answers.
